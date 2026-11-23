@@ -221,7 +221,12 @@ Removing these elements is a separate change (decision Q3).
   EF6, `packages.config`, `Global.asax`, `debug="true"`, or
   `customErrors mode="Off"` equivalents remain; and footer text no longer
   names MVC 5, EF 6, or .NET Framework 4.8
-- **Verification:** diff review and search of the source root
+- **Scope note (2026-11-23, human decision):** "remain" applies to the project,
+  source, and configuration files under `src/`, `tests/`, and the solution.
+  The tracked legacy `packages/` folder is excluded from this check and is not
+  edited or deleted.
+- **Verification:** diff review and search of the source root, excluding
+  `packages/`
 
 ### AC-10: Build and scope
 
