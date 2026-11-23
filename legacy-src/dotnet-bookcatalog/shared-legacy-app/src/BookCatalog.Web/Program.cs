@@ -30,3 +30,6 @@ app.MapControllerRoute(
     pattern: "{controller=Books}/{action=Index}/{id?}");
 
 app.Run();
+
+// Exposes the entry point to WebApplicationFactory in tests/.
+public partial class Program { }
