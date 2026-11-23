@@ -8,19 +8,13 @@
     <AssemblyName>BookCatalog.Web</AssemblyName>
   </PropertyGroup>
 
-  <!-- Task 001 only: classic files stay on disk until tasks 002-003 migrate or delete them. -->
+  <!-- Held out until task 003 replaces the EF6 seed with EF Core seed-if-empty logic. -->
   <ItemGroup>
-    <Compile Remove="App_Start\**" />
-    <Compile Remove="Controllers\**" />
-    <Compile Remove="Models\**" />
-    <Compile Remove="Global.asax.cs" />
-    <Content Remove="Views\**" />
-    <Content Remove="Web.config" />
-    <Content Remove="Global.asax" />
-    <None Remove="Views\**" />
-    <None Remove="Web.config" />
-    <None Remove="Global.asax" />
-    <None Remove="Global.asax.cs" />
+    <Compile Remove="Models\BookCatalogInitializer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.15" />
   </ItemGroup>
 
 </Project>

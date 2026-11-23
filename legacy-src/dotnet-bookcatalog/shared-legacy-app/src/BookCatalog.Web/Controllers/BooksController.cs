@@ -1,43 +1,45 @@
-using System;
-using System.Linq;
-using System.Web;
-using System.Web.Mvc;
 using BookCatalog.Web.Models;
+using Microsoft.AspNetCore.Mvc;
 
 namespace BookCatalog.Web.Controllers
 {
     public class BooksController : Controller
     {
-        private ApplicationDbContext db = new ApplicationDbContext();
+        private readonly ApplicationDbContext db;
 
-        public ActionResult Index()
+        public BooksController(ApplicationDbContext db)
+        {
+            this.db = db;
+        }
+
+        public IActionResult Index()
         {
             var books = db.Books.Where(b => b.IsActive).OrderBy(b => b.Title).ToList();
-            
-            var userAgent = HttpContext.Request.UserAgent;
-            ViewBag.UserAgent = userAgent;
-            
+
+            var userAgent = Request.Headers.UserAgent;
+            ViewBag.UserAgent = userAgent.Count > 0 ? userAgent.ToString() : null;
+
             return View(books);
         }
 
-        public ActionResult Details(int id)
+        public IActionResult Details(int id)
         {
             var book = db.Books.Find(id);
             if (book == null)
             {
-                return HttpNotFound();
+                return NotFound();
             }
             return View(book);
         }
 
-        public ActionResult Create()
+        public IActionResult Create()
         {
             return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult Create(Book book)
+        public IActionResult Create([Bind("Title,Author,ISBN,PublishedYear,IsActive")] Book book)
         {
             if (ModelState.IsValid)
             {
@@ -50,26 +52,26 @@ namespace BookCatalog.Web.Controllers
             return View(book);
         }
 
-        public ActionResult Edit(int id)
+        public IActionResult Edit(int id)
         {
             var book = db.Books.Find(id);
             if (book == null)
             {
-                return HttpNotFound();
+                return NotFound();
             }
             return View(book);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public ActionResult Edit(Book book)
+        public IActionResult Edit([Bind("Id,Title,Author,ISBN,PublishedYear,IsActive")] Book book)
         {
             if (ModelState.IsValid)
             {
                 var existingBook = db.Books.Find(book.Id);
                 if (existingBook == null)
                 {
-                    return HttpNotFound();
+                    return NotFound();
                 }
 
                 existingBook.Title = book.Title;
@@ -84,19 +86,19 @@ namespace BookCatalog.Web.Controllers
             return View(book);
         }
 
-        public ActionResult Delete(int id)
+        public IActionResult Delete(int id)
         {
             var book = db.Books.Find(id);
             if (book == null)
             {
-                return HttpNotFound();
+                return NotFound();
             }
             return View(book);
         }
 
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        public ActionResult DeleteConfirmed(int id)
+        public IActionResult DeleteConfirmed(int id)
         {
             var book = db.Books.Find(id);
             if (book != null)
@@ -105,15 +107,6 @@ namespace BookCatalog.Web.Controllers
                 db.SaveChanges();
             }
             return RedirectToAction("Index");
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                db.Dispose();
-            }
-            base.Dispose(disposing);
         }
     }
 }

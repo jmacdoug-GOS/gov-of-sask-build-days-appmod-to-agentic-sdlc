@@ -9,14 +9,14 @@ namespace BookCatalog.Web.Models
 
         [Required]
         [StringLength(200)]
-        public string Title { get; set; }
+        public string Title { get; set; } = string.Empty;
 
         [Required]
         [StringLength(100)]
-        public string Author { get; set; }
+        public string Author { get; set; } = string.Empty;
 
         [StringLength(13)]
-        public string ISBN { get; set; }
+        public string? ISBN { get; set; }
 
         [Display(Name = "Published Year")]
         [Range(1800, 2100)]
