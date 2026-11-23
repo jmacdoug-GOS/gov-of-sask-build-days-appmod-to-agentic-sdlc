@@ -5,7 +5,7 @@
 > **Prefer the web experience?** [Open this page on the course website](https://microsoft.github.io/dotnet-modernization-for-beginners/#/reference?path=shared-legacy-app%2FREADME.md) for the best reading experience and navigation.
 <!-- repo-only:end -->
 
-BookCatalog is an ASP.NET MVC 5 application using .NET Framework 4.8, EF6, and SQL Server LocalDB.
+BookCatalog is an ASP.NET Core MVC application on .NET 10 using EF Core and SQL Server LocalDB.
 
 Its users add, inspect, edit, and remove book records. The main list hides inactive books and sorts active books by title.
 
@@ -14,22 +14,18 @@ You can run this sample without completing the course. The modernization course 
 
 ## Windows quickstart
 
-You need Visual Studio web tools, .NET Framework 4.8 targeting tools, IIS Express, and `MSSQLLocalDB`.
+You need the .NET 10 SDK and `MSSQLLocalDB`.
 
-> **Sample data only.** The EF6 `DropCreateDatabaseIfModelChanges` initializer can replace its database after model changes.
+> **Sample data only.** The app uses the local `BookCatalogModernizedLab` database. EF Core migrations are applied at startup and the seed runs only when the `Books` table is empty. The database is never dropped or recreated on start.
 >
-> Never change the connection string to a business database. Do not create an empty MDF as a startup workaround.
+> Never change the connection string to a business database. Do not create an empty MDF.
 
-1. From the monorepo root, open `legacy-src\dotnet-bookcatalog\shared-legacy-app\BookCatalog.sln` in Visual Studio.
-2. Restore NuGet packages.
-3. Select **Build > Rebuild Solution**.
-4. Select IIS Express.
-5. Press F5.
-6. Check that the active catalog loads.
+1. From `legacy-src\dotnet-bookcatalog\shared-legacy-app`, run `dotnet build BookCatalog.sln -c Release`.
+2. Run `dotnet run --project src\BookCatalog.Web\BookCatalog.Web.csproj`.
+3. Open the URL printed by the command.
+4. Check that the active catalog loads.
 
-`NuGet.Config` restores packages into this solution's `packages` directory. That location matches the classic project's reference paths.
-
-Application startup creates `App_Data` before EF initialization. Do not precreate the directory or an empty MDF as a preparation step.
+The first start creates `BookCatalogModernizedLab` on `(localdb)\MSSQLLocalDB` and seeds it. Later starts keep existing data.
 
 A fresh database contains six active books and one inactive Matrix record. Existing sample data can change those counts.
 
@@ -38,9 +34,9 @@ Try adding an active sample book and editing it. Select **Active** explicitly wh
 The [upstream setup app tour](https://github.com/microsoft/dotnet-modernization-for-beginners/blob/82585e280fe00d0c56a075bf623dad1622c15911/03-prerequisites/README.md#run-bookcatalog) covers ordinary use.
 The [detailed behavior checklist](https://github.com/microsoft/dotnet-modernization-for-beginners/blob/82585e280fe00d0c56a075bf623dad1622c15911/docs/learner-record.md#behavior-checks) is optional.
 
-The connection uses integrated authentication and an MDF under the application's data directory. It does not contain a SQL password.
+The connection string is in `src\BookCatalog.Web\appsettings.json`. It uses integrated authentication to LocalDB and does not contain a SQL password.
 
-If startup fails, inspect the first error and check that `MSSQLLocalDB` is available. Don't create an empty MDF to fix an attachment error.
+If startup fails, inspect the first error and check that `MSSQLLocalDB` is available. Don't create an empty MDF to fix a connection error. To reset the sample data, drop the `BookCatalogModernizedLab` database yourself; the app will not do it.
 
 ## Working through the course
 
@@ -56,7 +52,7 @@ Chapter 06 upgrades **your copy** in place to ASP.NET Core MVC on .NET 10 with E
 
 The plan replaces the old web host. It doesn't keep a side-by-side host, shared schema, YARP, or System.Web adapters.
 
-The data is disposable. Let EF Core rebuild the schema and seed `BookCatalogModernizedLab`, recreating the demo database when needed.
+The data is disposable. EF Core migrations create the schema and the startup seed populates `BookCatalogModernizedLab`.
 
 Don't reset it on every startup. Add a book, edit it, and restart the upgraded app to confirm that the saved edit remains.
 
@@ -65,5 +61,3 @@ Existing records don't need to survive modernization. [Data transfer](https://gi
 The optional Azure deployment assets are under `legacy-src\dotnet-bookcatalog\examples\azure` and need separate access and cost approval.
 
 For comparison, inspect the original Git commit or another clone. Do not reset over your work.
-
-This project intentionally uses classic web application project format. SDK conversion and API migration belong to the exercise, not setup repairs.
