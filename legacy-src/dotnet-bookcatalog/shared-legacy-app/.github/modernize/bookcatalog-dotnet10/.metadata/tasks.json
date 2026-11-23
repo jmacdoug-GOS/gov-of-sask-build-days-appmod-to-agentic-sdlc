@@ -1,15 +1,110 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Tasks template for modernization plan. Generate this file alongside plan.md to track individual migration tasks.",
+  "description": "Ordered, incremental tasks for the BookCatalog .NET 10 modernization. Subordinate to specs/dotnet-bookcatalog-modernization.md (D1-D9).",
   "tasks": [
     {
       "type": "upgrade",
-      "id": "001-upgrade-dotnet10",
-      "description": "Upgrade BookCatalog from ASP.NET MVC 5 on .NET Framework 4.8 with EF6 to ASP.NET Core MVC on .NET 10 with EF Core, while preserving the catalog's existing CRUD behavior, routes, validation, antiforgery protection, and visible UI.",
-      "reason": "The approved specification requires replacing System.Web, Global.asax, RouteConfig/FilterConfig startup, packages.config, and the EF6 DbContext with a supported .NET 10 SDK-style ASP.NET Core MVC host and EF Core, because .NET Framework 4.8 MVC 5/EF6 blocks modern tooling and the user explicitly requested the .NET 10 upgrade.",
-      "requirements": "Convert the project to SDK-style targeting net10.0 (per Root/global.json pinning SDK 10.0.100). Replace the ASP.NET MVC 5/System.Web host with ASP.NET Core MVC, removing Global.asax, App_Start/RouteConfig, App_Start/FilterConfig, and packages.config. Preserve: the default route opening the books list with the {controller}/{action}/{id} pattern (FR-1); listing only active books ordered by title (FR-2); HTTP 404 for unknown ids on Details/Edit/Delete (FR-3); Create/Edit field validation (Title required max 200, Author required max 100, ISBN optional max 13, Published Year optional 1800-2100, Active) and CreatedDate set at creation (FR-4); new Book defaulting to Active=true and CreatedDate = DateTime.Now in local time, not UTC (FR-5); Edit updating only Title/Author/ISBN/PublishedYear/Active without changing CreatedDate (FR-6); Delete as a confirmation page followed by a hard-delete POST that redirects to the list even for an already-missing id (FR-7); antiforgery tokens required on all state-changing POSTs (FR-8); and seed-if-empty startup logic that seeds seven books (six active, one inactive: 'The Matrix: The Shooting Script') only when the database is empty, never resetting existing data (FR-9, FR-12, NFR-3). Replace the EF6 DbContext and DropCreateDatabaseIfModelChanges initializer with EF Core and the SQL Server provider, using EF Core migrations applied at startup to create the schema; point local development at a new LocalDB database named BookCatalogModernizedLab and do not migrate or reuse records from the old MDF (FR-11, FR-16). Remove the Directory.CreateDirectory call and App_Data folder used for LocalDB DataDirectory; no user files are stored (FR-15). Update footer text that names ASP.NET MVC 5, Entity Framework 6, or .NET Framework 4.8 to reflect the new platform; this is the only visible-content exception (FR-13). Preserve all other visible page content, labels, columns, and layout as-is, including the legacy decorative/diagnostic elements: the YOUR BROWSER user-agent box, the static visitor counter 001337, the static 'Page generated in 0.042 seconds' text, and the Internet Explorer hint. Do not carry forward Web.config debug=\"true\" or customErrors mode=\"Off\" as production-style defaults; limit detailed errors to development. Add a new automated test project under tests/ (none exists today) covering AC-1 through AC-10 where practical: active-only title-ordered listing, 404 on unknown ids, valid create persisting CreatedDate, invalid create/edit redisplaying with validation errors and no save, edit persisting across restart without changing CreatedDate, hard delete, antiforgery rejection, seed-if-empty behavior, and the platform/configuration checks (no System.Web, EF6, packages.config, Global.asax, debug=\"true\", or customErrors mode=\"Off\" equivalents remain). Only touch files under legacy-src/dotnet-bookcatalog/shared-legacy-app/src/BookCatalog.Web/**, BookCatalog.sln, global.json, NuGet.Config, README.md, and the new tests/** project; never hand-edit packages/, bin/, obj/, or generated database files. Do not add Azure services, authentication, deployment, or any feature not listed above. Record any added package in the change summary.",
-      "environmentConfiguration": ".NET 10 SDK (global.json pins 10.0.100, rollForward latestMajor); SQL Server LocalDB for local development.",
+      "id": "001-sdk-style-net10-build",
+      "description": "Convert BookCatalog.Web to an SDK-style net10.0 web project so that dotnet build BookCatalog.sln -c Release succeeds.",
+      "reason": "FR-10 and D1 require a .NET 10 host; a green build milestone isolates project-format problems from code migration.",
+      "requirements": "Use Microsoft.NET.Sdk.Web with net10.0 (global.json pins 10.0.100). Remove packages.config; add a minimal Program.cs; update the BookCatalog.sln project entry. Temporarily exclude not-yet-migrated classic files (controllers, models, Views, Global.asax*, App_Start) from compilation with explicit project item removals; do not delete them yet. All exclusions must be removed by task 003. The app is not expected to serve the catalog after this task. Do not add Azure, auth, or any dependency beyond FR-10 to FR-12.",
+      "allowedPaths": [
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/src/BookCatalog.Web/**",
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/BookCatalog.sln",
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/NuGet.Config",
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/global.json"
+      ],
+      "validationCommand": "cd legacy-src/dotnet-bookcatalog/shared-legacy-app; dotnet build BookCatalog.sln -c Release; git diff --name-only; git status --short",
+      "rollbackContainment": "One reviewable diff. Restore tracked files in the allowed paths (for example git restore -- <paths>) and delete only untracked files this task created (listed by git status --short); no blanket clean. Never touch packages/, bin/, obj/. No database is touched.",
+      "stopConditions": [
+        "The .NET 10 SDK is missing or global.json cannot be satisfied (record the prerequisite; do not report a pass)",
+        "Restore needs a package feed other than the configured nuget.org",
+        "The build requires changes outside the allowed paths",
+        "A package beyond FR-10 to FR-12 would be needed"
+      ],
+      "environmentConfiguration": ".NET 10 SDK (global.json pins 10.0.100, rollForward latestMajor).",
       "dependencies": [],
+      "skills": [],
+      "successCriteria": {
+        "passBuild": "true",
+        "passUnitTests": "false"
+      }
+    },
+    {
+      "type": "upgrade",
+      "id": "002-aspnetcore-mvc-migration",
+      "description": "Migrate ASP.NET MVC 5 hosting, routing, controllers, views, static content, validation, antiforgery, and 404 behavior to ASP.NET Core MVC on .NET 10.",
+      "reason": "FR-1 to FR-8, FR-10, FR-13, FR-14 and D1/D3: replace System.Web, Global.asax, RouteConfig and FilterConfig while preserving user-visible behavior.",
+      "requirements": "Default route {controller=Books}/{action=Index}/{id?} (FR-1). Index lists only active books ordered by title (FR-2). Details/Edit GET/Edit POST/Delete GET return 404 for an unknown id; Delete POST for a missing id redirects to the list (FR-3, FR-7). Model validation stays on the model: Title required max 200, Author required max 100, ISBN optional max 13, Published Year optional 1800-2100; with nullable reference types ensure ISBN and PublishedYear stay optional (FR-4, NFR-4). New Book defaults IsActive=true and CreatedDate=DateTime.Now (FR-5). Edit binds and updates only Title, Author, ISBN, PublishedYear, IsActive and never changes CreatedDate (FR-6). Explicit [ValidateAntiForgeryToken] (or global auto-validate) on Create, Edit and Delete POST (FR-8). Keep /Content/Site.css?v=2 working. Preserve all visible content including the YOUR BROWSER box (HTML-encoded, only when a user agent exists), visitor counter 001337, static 'Page generated in 0.042 seconds', and the Internet Explorer hint; only update footer text naming MVC 5, EF 6 or .NET Framework 4.8 (FR-13). Detailed errors only in Development; no debug=true or customErrors Off equivalents (FR-14). Controllers stay thin. May add only the EF Core package reference and a compile-only ApplicationDbContext registered in DI (no migrations, seed, or database creation). Delete Global.asax*, App_Start, Web.config and Views/Web.config once superseded. No System.Web adapters, YARP, side-by-side host, auth, or new features (D9, Exclusions).",
+      "allowedPaths": [
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/src/BookCatalog.Web/**",
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/BookCatalog.sln"
+      ],
+      "validationCommand": "cd legacy-src/dotnet-bookcatalog/shared-legacy-app; dotnet build BookCatalog.sln -c Release; git diff --name-only; git status --short; then a database-free local smoke check: GET /Content/Site.css = 200, GET /Books/Create = 200 with an antiforgery field, POST to Create without a token is rejected, unknown route = 404",
+      "rollbackContainment": "One reviewable diff. Restore tracked files in the allowed paths and delete only untracked files this task created; no blanket clean. Never touch packages/, bin/, obj/. No database is created or touched in this task.",
+      "stopConditions": [
+        "A view or route cannot be preserved without changing visible content or URL shape",
+        "A System.Web adapter, YARP, or side-by-side host would be required (D9)",
+        "A package beyond FR-10 to FR-12 would be needed",
+        "Build fails for a reason that cannot be fixed within the allowed paths"
+      ],
+      "environmentConfiguration": ".NET 10 SDK; no LocalDB required for this task.",
+      "dependencies": ["001-sdk-style-net10-build"],
+      "skills": [],
+      "successCriteria": {
+        "passBuild": "true",
+        "passUnitTests": "false"
+      }
+    },
+    {
+      "type": "upgrade",
+      "id": "003-efcore-di-seed-migrations",
+      "description": "Migrate EF6 to EF Core (SQL Server provider) with dependency injection, deterministic seed-if-empty data, and EF Core migrations applied at startup against a new BookCatalogModernizedLab LocalDB database.",
+      "reason": "FR-9, FR-11, FR-12, FR-15, FR-16, NFR-3 and D2, D4, D6, D7: replace the EF6 DbContext and DropCreateDatabaseIfModelChanges initializer without resetting data on each start.",
+      "requirements": "Use Microsoft.EntityFrameworkCore.SqlServer; record the EF Core design-time package in the PR (D6). Register the context with AddDbContext; connection string in appsettings.json: LocalDB, Integrated Security=True, Initial Catalog=BookCatalogModernizedLab, no AttachDbFilename, no user id or password, no secret (D7, NFR-1, NFR-2). Create an initial migration preserving model constraints; apply migrations at startup; never EnsureDeleted or recreate the database per start. Seed only when the Books table is empty (startup logic, not HasData) with the seven existing synthetic books, six active and 'The Matrix: The Shooting Script' inactive, using their existing fixed CreatedDate values. Do not import records from the old MDF (FR-16). Remove EF6 types, BookCatalogInitializer, Directory.CreateDirectory and App_Data (FR-15), and every temporary exclusion from task 001. Update README.md where classic setup steps are inaccurate. Do not touch packages/.",
+      "allowedPaths": [
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/src/BookCatalog.Web/**",
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/BookCatalog.sln",
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/README.md"
+      ],
+      "validationCommand": "cd legacy-src/dotnet-bookcatalog/shared-legacy-app; dotnet build BookCatalog.sln -c Release; git diff --name-only; git status --short; then run locally against LocalDB: first start creates BookCatalogModernizedLab with 7 books and lists 6 at / and /Books; a second start does not reseed; drop the database afterwards",
+      "rollbackContainment": "One reviewable diff. Restore tracked files in the allowed paths; delete only untracked files this task created (including its migration files); drop BookCatalogModernizedLab; no blanket clean. Never touch packages/, bin/, obj/, or generated database files; never create an empty MDF.",
+      "stopConditions": [
+        "LocalDB is unavailable (record the missing prerequisite; do not report a pass)",
+        "A non-local or business database, secret, or password would be required",
+        "The schema must differ from the existing model constraints",
+        "An MDF or App_Data workaround appears necessary",
+        "A package beyond FR-10 to FR-12 would be needed"
+      ],
+      "environmentConfiguration": ".NET 10 SDK; SQL Server LocalDB (MSSQLLocalDB) for local development only.",
+      "dependencies": ["002-aspnetcore-mvc-migration"],
+      "skills": [],
+      "successCriteria": {
+        "passBuild": "true",
+        "passUnitTests": "false"
+      }
+    },
+    {
+      "type": "upgrade",
+      "id": "004-tests-and-local-crud-verification",
+      "description": "Add a tests/ project and verify local CRUD, active filtering, ordering, validation, antiforgery, 404, seed-if-empty, and persistence.",
+      "reason": "Behavior had no tests (review notes); the spec requires AC-1 to AC-8 evidence where practical (decision Q2) and AC-10 command results.",
+      "requirements": "Add a test project under tests/ to BookCatalog.sln using only packages needed for tests, each recorded in the PR. Cover where practical: active-only title-ordered list (AC-1); 404 on unknown ids (AC-2); valid create persists CreatedDate and redirects (AC-3); invalid create/edit with missing Title/Author, Year 1799/1800/2100/2101, and length boundaries 200/201, 100/101, 13/14 redisplays with errors and saves nothing (AC-4); edit persists across host restart without changing CreatedDate (AC-5; may instead be a recorded manual check on disposable data); hard delete and missing-id redirect (AC-6); antiforgery rejection on Create/Edit/Delete POST (AC-7); seed-if-empty (AC-8). AC-9 is verified by diff review and search of the source root (no System.Web, EF6, packages.config, Global.asax, debug=true, customErrors Off, or old footer text); AC-10 by command results; these are not replaced by tests. Tests use a uniquely named disposable LocalDB database (never BookCatalogModernizedLab), only visibly synthetic records, and drop it on teardown. Production edits limited to minimal testability changes, each recorded.",
+      "allowedPaths": [
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/tests/**",
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/BookCatalog.sln",
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/src/BookCatalog.Web/**"
+      ],
+      "validationCommand": "cd legacy-src/dotnet-bookcatalog/shared-legacy-app; dotnet build BookCatalog.sln -c Release; dotnet test; git diff --name-only; git status --short; plus a recorded local CRUD check (create, edit, restart, delete) with the database dropped afterwards",
+      "rollbackContainment": "One reviewable diff. Restore tracked files; delete only untracked test files this task created; drop temporary test databases and BookCatalogModernizedLab; no blanket clean. Never touch packages/, bin/, obj/.",
+      "stopConditions": [
+        "A test failure shows a behavior change that cannot be fixed without altering an acceptance criterion",
+        "Tests would need production data, secrets, or a shared database",
+        "LocalDB is unavailable (record the missing prerequisite; do not report a pass)",
+        "A production change beyond minimal testability is required"
+      ],
+      "environmentConfiguration": ".NET 10 SDK; SQL Server LocalDB for local tests only.",
+      "dependencies": ["003-efcore-di-seed-migrations"],
       "skills": [],
       "successCriteria": {
         "passBuild": "true",
@@ -18,12 +113,26 @@
     },
     {
       "type": "security",
-      "id": "002-security-cve-remediation",
-      "description": "Scan BookCatalog's NuGet dependencies for known CVEs after the .NET 10 upgrade and remediate any identified vulnerabilities.",
-      "reason": "Every modernization plan includes CVE remediation to ensure the modernized application has no known vulnerable dependencies before it is considered complete; the SDK-style package move in task 001 is a natural point to verify this.",
-      "requirements": "Upgrade vulnerable NuGet dependencies to the minimum patched version. If a CVE fix requires a major version upgrade, document the affected dependency, its current version, the upgraded major version, and the breaking-change risk. Verify the project still builds with `dotnet build BookCatalog.sln -c Release` and that `dotnet test` still passes after remediation. Scope remediation to dependencies used by legacy-src/dotnet-bookcatalog/shared-legacy-app only; do not introduce Azure SDK packages or other dependencies unrelated to CVE fixes.",
-      "environmentConfiguration": ".NET 10 SDK and `dotnet` CLI established by task 001.",
-      "dependencies": ["001-upgrade-dotnet10"],
+      "id": "005-dependency-cve-scan",
+      "description": "Scan the NuGet dependencies of BookCatalog.sln for known CVEs and apply bounded remediation.",
+      "reason": "Requested by the plan author as the final increment; bounded by the spec's Dependencies constraint (only packages needed for FR-10 to FR-12 plus test packages). Not itself a spec requirement.",
+      "requirements": "Scan direct and transitive packages. Upgrade only vulnerable packages to the minimum patched version. Do not add packages unrelated to a fix and no Azure SDKs. If a fix needs a major-version bump, document the package, current version, proposed version and breaking-change risk and ask before applying. Record every finding and change in the PR. Re-run build and tests after remediation.",
+      "allowedPaths": [
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/src/BookCatalog.Web/*.csproj",
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/tests/**/*.csproj",
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/NuGet.Config",
+        "legacy-src/dotnet-bookcatalog/shared-legacy-app/BookCatalog.sln"
+      ],
+      "validationCommand": "cd legacy-src/dotnet-bookcatalog/shared-legacy-app; dotnet list BookCatalog.sln package --vulnerable --include-transitive; dotnet build BookCatalog.sln -c Release; dotnet test; git diff --name-only; git status --short",
+      "rollbackContainment": "One reviewable diff limited to project files; restore them with git restore. No code or data is changed.",
+      "stopConditions": [
+        "The vulnerability feed is unreachable (record it; do not report clean)",
+        "A fix needs a major-version bump or a package change beyond FR-10 to FR-12, or a route or schema change",
+        "A remediation would change visible behavior",
+        "Build or tests fail for a reason that cannot be fixed within the allowed paths"
+      ],
+      "environmentConfiguration": ".NET 10 SDK and dotnet CLI; network access to the configured nuget.org feed for the scan.",
+      "dependencies": ["004-tests-and-local-crud-verification"],
       "skills": [
         {
           "name": "validate-cves-and-fix",
@@ -41,6 +150,6 @@
     "projectName": "BookCatalog",
     "language": "dotnet",
     "createdAt": "2026-11-23T13:57:29-06:00",
-    "version": "1.0"
+    "version": "1.1"
   }
 }
