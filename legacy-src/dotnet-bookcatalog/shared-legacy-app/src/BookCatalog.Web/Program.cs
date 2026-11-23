@@ -10,6 +10,12 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 var app = builder.Build();
 
+// Applies pending migrations and seeds only an empty Books table; never drops or recreates the database.
+using (var scope = app.Services.CreateScope())
+{
+    DatabaseInitializer.Initialize(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
+}
+
 // Site.css lives in Content/ (not wwwroot) and keeps its /Content/Site.css URL.
 app.UseStaticFiles(new StaticFileOptions
 {
