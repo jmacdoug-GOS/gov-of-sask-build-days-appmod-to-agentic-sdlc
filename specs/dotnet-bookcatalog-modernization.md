@@ -3,7 +3,7 @@
 ## Metadata
 
 - **Owner:** Workshop application team (human owner to confirm at approval)
-- **Status:** Draft
+- **Status:** Approved
 - **Source root:** `legacy-src/dotnet-bookcatalog/shared-legacy-app`
 - **Related issue:** not created
 
@@ -342,11 +342,11 @@ Stop and request human guidance if:
 
 ### Human approval
 
-- [ ] I reviewed the evidence, unresolved questions, allowed paths, acceptance
+- [x] I reviewed the evidence, unresolved questions, allowed paths, acceptance
       criteria, validation command, exclusions, risks, and stop conditions.
-- **Reviewer:** not yet reviewed
-- **Approval date:** not yet approved
-- **Approved specification commit:** not yet approved
+- **Reviewer:** jmacdoug-GOS (self-review; no second reviewer in this workshop run)
+- **Approval date:** 2026-11-23
+- **Approved specification commit:** 3a5679f
 
 Change **Status** to `Approved` only after the checkbox is selected and the
 reviewer, date, and commit fields are complete. Planning approval authorizes
