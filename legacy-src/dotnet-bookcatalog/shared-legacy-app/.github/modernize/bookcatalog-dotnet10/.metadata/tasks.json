@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Tasks template for modernization plan. Generate this file alongside plan.md to track individual migration tasks.",
+  "tasks": [
+    {
+      "type": "upgrade",
+      "id": "001-upgrade-dotnet10",
+      "description": "Upgrade BookCatalog from ASP.NET MVC 5 on .NET Framework 4.8 with EF6 to ASP.NET Core MVC on .NET 10 with EF Core, while preserving the catalog's existing CRUD behavior, routes, validation, antiforgery protection, and visible UI.",
+      "reason": "The approved specification requires replacing System.Web, Global.asax, RouteConfig/FilterConfig startup, packages.config, and the EF6 DbContext with a supported .NET 10 SDK-style ASP.NET Core MVC host and EF Core, because .NET Framework 4.8 MVC 5/EF6 blocks modern tooling and the user explicitly requested the .NET 10 upgrade.",
+      "requirements": "Convert the project to SDK-style targeting net10.0 (per Root/global.json pinning SDK 10.0.100). Replace the ASP.NET MVC 5/System.Web host with ASP.NET Core MVC, removing Global.asax, App_Start/RouteConfig, App_Start/FilterConfig, and packages.config. Preserve: the default route opening the books list with the {controller}/{action}/{id} pattern (FR-1); listing only active books ordered by title (FR-2); HTTP 404 for unknown ids on Details/Edit/Delete (FR-3); Create/Edit field validation (Title required max 200, Author required max 100, ISBN optional max 13, Published Year optional 1800-2100, Active) and CreatedDate set at creation (FR-4); new Book defaulting to Active=true and CreatedDate = DateTime.Now in local time, not UTC (FR-5); Edit updating only Title/Author/ISBN/PublishedYear/Active without changing CreatedDate (FR-6); Delete as a confirmation page followed by a hard-delete POST that redirects to the list even for an already-missing id (FR-7); antiforgery tokens required on all state-changing POSTs (FR-8); and seed-if-empty startup logic that seeds seven books (six active, one inactive: 'The Matrix: The Shooting Script') only when the database is empty, never resetting existing data (FR-9, FR-12, NFR-3). Replace the EF6 DbContext and DropCreateDatabaseIfModelChanges initializer with EF Core and the SQL Server provider, using EF Core migrations applied at startup to create the schema; point local development at a new LocalDB database named BookCatalogModernizedLab and do not migrate or reuse records from the old MDF (FR-11, FR-16). Remove the Directory.CreateDirectory call and App_Data folder used for LocalDB DataDirectory; no user files are stored (FR-15). Update footer text that names ASP.NET MVC 5, Entity Framework 6, or .NET Framework 4.8 to reflect the new platform; this is the only visible-content exception (FR-13). Preserve all other visible page content, labels, columns, and layout as-is, including the legacy decorative/diagnostic elements: the YOUR BROWSER user-agent box, the static visitor counter 001337, the static 'Page generated in 0.042 seconds' text, and the Internet Explorer hint. Do not carry forward Web.config debug=\"true\" or customErrors mode=\"Off\" as production-style defaults; limit detailed errors to development. Add a new automated test project under tests/ (none exists today) covering AC-1 through AC-10 where practical: active-only title-ordered listing, 404 on unknown ids, valid create persisting CreatedDate, invalid create/edit redisplaying with validation errors and no save, edit persisting across restart without changing CreatedDate, hard delete, antiforgery rejection, seed-if-empty behavior, and the platform/configuration checks (no System.Web, EF6, packages.config, Global.asax, debug=\"true\", or customErrors mode=\"Off\" equivalents remain). Only touch files under legacy-src/dotnet-bookcatalog/shared-legacy-app/src/BookCatalog.Web/**, BookCatalog.sln, global.json, NuGet.Config, README.md, and the new tests/** project; never hand-edit packages/, bin/, obj/, or generated database files. Do not add Azure services, authentication, deployment, or any feature not listed above. Record any added package in the change summary.",
+      "environmentConfiguration": ".NET 10 SDK (global.json pins 10.0.100, rollForward latestMajor); SQL Server LocalDB for local development.",
+      "dependencies": [],
+      "skills": [],
+      "successCriteria": {
+        "passBuild": "true",
+        "passUnitTests": "true"
+      }
+    },
+    {
+      "type": "security",
+      "id": "002-security-cve-remediation",
+      "description": "Scan BookCatalog's NuGet dependencies for known CVEs after the .NET 10 upgrade and remediate any identified vulnerabilities.",
+      "reason": "Every modernization plan includes CVE remediation to ensure the modernized application has no known vulnerable dependencies before it is considered complete; the SDK-style package move in task 001 is a natural point to verify this.",
+      "requirements": "Upgrade vulnerable NuGet dependencies to the minimum patched version. If a CVE fix requires a major version upgrade, document the affected dependency, its current version, the upgraded major version, and the breaking-change risk. Verify the project still builds with `dotnet build BookCatalog.sln -c Release` and that `dotnet test` still passes after remediation. Scope remediation to dependencies used by legacy-src/dotnet-bookcatalog/shared-legacy-app only; do not introduce Azure SDK packages or other dependencies unrelated to CVE fixes.",
+      "environmentConfiguration": ".NET 10 SDK and `dotnet` CLI established by task 001.",
+      "dependencies": ["001-upgrade-dotnet10"],
+      "skills": [
+        {
+          "name": "validate-cves-and-fix",
+          "location": "builtin"
+        }
+      ],
+      "successCriteria": {
+        "passBuild": "true",
+        "passUnitTests": "true"
+      }
+    }
+  ],
+  "metadata": {
+    "planName": "bookcatalog-dotnet10",
+    "projectName": "BookCatalog",
+    "language": "dotnet",
+    "createdAt": "2026-11-23T13:57:29-06:00",
+    "version": "1.0"
+  }
+}
