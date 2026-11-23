@@ -25,7 +25,7 @@ active books sorted by title (`Root/README.md`). It is an ASP.NET MVC 5,
 .NET Framework 4.8, EF6, SQL Server LocalDB application (`Root/README.md`;
 `Src/Web.config`; `Src/packages.config`). The Report classifies it as
 .NET Framework 4.8, recommends "Migrate to .NET 10", 6R **Replatform**, and
-lists one mandatory issue and two potential issues
+lists six issues: one mandatory, two potential, and three optional
 (`Report/index.md`; `Report/repos/shared-legacy-app/report.md`).
 
 Platform dependencies that block a supported runtime include `System.Web`,
@@ -63,7 +63,7 @@ specification.
 | FR-4 | Create shall accept Title (required, max 200), Author (required, max 100), ISBN (optional, max 13), Published Year (optional, 1800–2100), and Active, and shall set `CreatedDate` at creation; invalid input shall redisplay the form without saving. | `Src/Models/Book.cs`; `BooksController.cs:44`; Notes |
 | FR-5 | A new Book defaults to Active = true and `CreatedDate` = now in local time (`DateTime.Now`) on the model; UTC would be a separate deliberate change (decision Q5). | `Src/Models/Book.cs` constructor |
 | FR-6 | Edit shall update Title, Author, ISBN, Published Year, and Active only; it shall not change `CreatedDate`. | `BooksController.cs` `Edit` POST |
-| FR-7 | Delete shall be a confirmation page followed by a POST that permanently removes the record (hard delete); deleting an already-missing id shall redirect to the list without error. | `BooksController.cs:104` `DeleteConfirmed`; Notes |
+| FR-7 | Delete shall be a confirmation page followed by a POST that permanently removes the record (hard delete); deleting an already-missing id shall redirect to the list without error. | `BooksController.cs:99` `DeleteConfirmed`; Notes |
 | FR-8 | All state-changing POST actions (Create, Edit, Delete) shall require an antiforgery token. | `BooksController.cs` `[ValidateAntiForgeryToken]`; Notes |
 | FR-9 | An empty database shall be seeded once at startup with seven books, six active and one inactive ("The Matrix: The Shooting Script"), and a populated database shall not be reseeded. | `Src/Global.asax.cs`; `Src/Models/ApplicationDbContext.cs` `SeedBooks`; Notes; `Root/README.md` |
 
@@ -86,7 +86,7 @@ Removing these elements is a separate change (decision Q3).
 | FR-12 | Seed-if-empty shall be preserved as startup logic that does not reset existing data on every start, so an edit survives an application restart. | `Src/Global.asax.cs`; `Root/README.md` |
 | FR-13 | Footer text that names ASP.NET MVC 5, Entity Framework 6, or .NET Framework 4.8 shall be updated to the new platform. | `Src/Views/Shared/_Layout.cshtml` (static claim becomes false) |
 | FR-14 | `Web.config` `debug="true"` and `customErrors mode="Off"` shall not be carried forward as production-style defaults; detailed errors shall be limited to development. | `Src/Web.config:16,18`; Notes |
-| FR-15 | The `Directory.CreateDirectory` call for LocalDB `DataDirectory`, and the folder it creates, shall be removed. No user files are stored. | `Src/Global.asax.cs:15`; Notes (the Report's "Azure Blob Storage for local file system" claim is unsupported) |
+| FR-15 | The `Directory.CreateDirectory` call for LocalDB `DataDirectory`, and the folder it creates, shall be removed. No user files are stored. | `Src/Global.asax.cs:16` (Notes and Report cite line 15; the call is on line 16); Notes (the Report's "Azure Blob Storage for local file system" claim is unsupported) |
 | FR-16 | Existing records need not survive; the database is disposable sample data. | `Root/README.md` |
 
 ## Constraints and out of scope
@@ -278,6 +278,38 @@ Removing these elements is a separate change (decision Q3).
 | Baseline needs Windows, VS MSBuild, .NET Framework 4.8 targeting tools, LocalDB. | Dependency | Record missing prerequisites instead of reporting a pass (`legacy-src/dotnet-bookcatalog/AGENTS.md`). |
 | .NET SDK 10 or later is required. | Dependency | `Root/global.json` pins 10.0.100 with `rollForward: latestMajor`. |
 | Report findings about SQL connection, `System.Data.SqlClient`, and connection strings point to `Web.config`. | Assumption | Verified against `Src/Web.config`; these are resolved by FR-11 and FR-14. |
+
+## Technical decisions
+
+Recorded during reconciliation of the Report and Notes against source on
+2026-11-23. Each decision implements an existing requirement; none changes
+intent, constraints, acceptance criteria, allowed paths, validation, or stop
+conditions. No ADR is used.
+
+| # | Decision | Basis |
+| --- | --- | --- |
+| D1 | Target .NET 10 and ASP.NET Core MVC in a single host. | FR-10; `Root/global.json`; Report recommends "Migrate to .NET 10" |
+| D2 | Replace EF6 with EF Core and the SQL Server provider. | FR-11; `Src/Models/ApplicationDbContext.cs` |
+| D3 | Preserve active-only title ordering, CRUD, model validation, antiforgery on POST, and persistence across restart. | FR-2 to FR-9, FR-12; AC-1 to AC-8 |
+| D4 | Data is disposable workshop data. Create and seed a new `BookCatalogModernizedLab` LocalDB database; do not migrate records from the old MDF. | FR-11, FR-16; Q4; `Root/README.md` |
+| D5 | The request user-agent diagnostic (`YOUR BROWSER`) is preserved as-is, with the other legacy UI elements. | Q3; `Src/Controllers/BooksController.cs` `Index`; `Src/Views/Books/Index.cshtml:67-70` |
+| D6 | Use EF Core migrations to create the schema, applied at startup. Never delete and recreate the database on every startup; seed only when empty. The EF Core design-time package is recorded in the pull request. | FR-12; NFR-3; AC-5, AC-8; Dependencies constraint |
+| D7 | Local integrated authentication to LocalDB, with no password in configuration. The Report's "Windows authentication detected" finding reflects `Integrated Security=True` in `Src/Web.config`; no user-facing login is added. | NFR-1, NFR-2; Security section; Exclusions |
+| D8 | Azure is considered only after local verification and is out of scope for now. | NFR-5; Exclusions; Deployment section |
+| D9 | No side-by-side `System.Web` host, YARP proxy, shared legacy schema, or `System.Web` adapters. | Dependencies constraint; `Root/README.md` |
+
+### Evidence reconciliation (2026-11-23)
+
+- Report: 6 issues (1 mandatory, 2 potential, 3 optional); Blocked; 6R
+  Replatform; ~$63/month estimate; no Codebase Insights. Confirmed against
+  `Report/index.md` and `Report/repos/shared-legacy-app/report.md`.
+- Source citations confirmed: route pattern, `Index` filter and ordering,
+  `Create` `CreatedDate` (`BooksController.cs:44`), `DeleteConfirmed` (line 99,
+  not 104 as in Notes), `Web.config` lines 16 and 18,
+  `Directory.CreateDirectory` (`Global.asax.cs:16`, not 15), model validation
+  ranges, seven seed books with one inactive, and footer and legacy UI text in
+  `Src/Views/Shared/_Layout.cshtml`.
+- No `tests/` directory exists yet, matching Notes.
 
 ## Plan-mode review checkpoint
 
